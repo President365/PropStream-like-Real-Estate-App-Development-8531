@@ -1,0 +1,363 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import SafeIcon from '../../common/SafeIcon';
+import * as FiIcons from 'react-icons/fi';
+
+const { FiDownload, FiFileText, FiImage, FiDatabase, FiMail } = FiIcons;
+
+const DealExport = ({ property, offerCalculation, aiAnalysis }) => {
+  const [exportFormat, setExportFormat] = useState('pdf');
+  const [includeOptions, setIncludeOptions] = useState({
+    propertyDetails: true,
+    offerCalculation: true,
+    aiAnalysis: true,
+    comparables: true,
+    photos: false,
+    marketData: true
+  });
+
+  const generatePDFReport = () => {
+    const reportData = {
+      title: `Investment Analysis Report - ${property?.address || 'Property'}`,
+      date: new Date().toLocaleDateString(),
+      property: {
+        address: property?.address,
+        price: property?.price,
+        bedrooms: property?.bedrooms,
+        bathrooms: property?.bathrooms,
+        sqft: property?.sqft,
+        yearBuilt: property?.yearBuilt,
+        propertyType: property?.propertyType,
+        status: property?.status,
+        daysOnMarket: property?.daysOnMarket
+      },
+      offers: offerCalculation ? {
+        conservative: offerCalculation.conservativeOffer,
+        aggressive: offerCalculation.aggressiveOffer,
+        market: offerCalculation.marketOffer,
+        arv: offerCalculation.arv,
+        totalCosts: offerCalculation.totalCosts,
+        projectedProfit: offerCalculation.projectedProfit,
+        roi: offerCalculation.roi
+      } : null,
+      aiInsights: aiAnalysis ? {
+        score: aiAnalysis.investmentScore || aiAnalysis.score,
+        analysis: aiAnalysis.analysis,
+        recommendations: aiAnalysis.recommendations,
+        priceAssessment: aiAnalysis.priceAssessment
+      } : null,
+      comparables: property?.comparables || [],
+      marketData: {
+        trend: property?.marketTrend,
+        leadPotential: property?.leadPotential
+      }
+    };
+
+    // Create a formatted text report (in a real app, you'd use a PDF library)
+    let reportContent = `
+INVESTMENT ANALYSIS REPORT
+${reportData.title}
+Generated: ${reportData.date}
+
+==================================================
+PROPERTY DETAILS
+==================================================
+Address: ${reportData.property.address}
+Price: $${reportData.property.price?.toLocaleString()}
+Size: ${reportData.property.sqft?.toLocaleString()} sqft
+Bedrooms: ${reportData.property.bedrooms}
+Bathrooms: ${reportData.property.bathrooms}
+Year Built: ${reportData.property.yearBuilt}
+Property Type: ${reportData.property.propertyType}
+Status: ${reportData.property.status}
+Days on Market: ${reportData.property.daysOnMarket}
+
+==================================================
+OFFER ANALYSIS
+==================================================`;
+
+    if (reportData.offers) {
+      reportContent += `
+Conservative Offer: $${reportData.offers.conservative?.toLocaleString()}
+  - Projected Profit: $${reportData.offers.projectedProfit.conservative?.toLocaleString()}
+  - ROI: ${reportData.offers.roi.conservative?.toFixed(1)}%
+
+Aggressive Offer: $${reportData.offers.aggressive?.toLocaleString()}
+  - Projected Profit: $${reportData.offers.projectedProfit.aggressive?.toLocaleString()}
+  - ROI: ${reportData.offers.roi.aggressive?.toFixed(1)}%
+
+Market Offer: $${reportData.offers.market?.toLocaleString()}
+  - Projected Profit: $${reportData.offers.projectedProfit.market?.toLocaleString()}
+  - ROI: ${reportData.offers.roi.market?.toFixed(1)}%
+
+After Repair Value (ARV): $${reportData.offers.arv?.toLocaleString()}
+Total Investment Costs: $${reportData.offers.totalCosts?.toLocaleString()}`;
+    }
+
+    if (reportData.aiInsights) {
+      reportContent += `
+
+==================================================
+AI ANALYSIS
+==================================================
+Investment Score: ${reportData.aiInsights.score}/100
+Price Assessment: ${reportData.aiInsights.priceAssessment}
+
+Analysis:
+${reportData.aiInsights.analysis}
+
+AI Recommendations:`;
+      
+      reportData.aiInsights.recommendations?.forEach((rec, index) => {
+        reportContent += `\n${index + 1}. ${rec}`;
+      });
+    }
+
+    if (reportData.comparables.length > 0) {
+      reportContent += `
+
+==================================================
+COMPARABLE SALES
+==================================================`;
+      reportData.comparables.forEach((comp, index) => {
+        reportContent += `
+${index + 1}. ${comp.address}
+   Price: $${comp.price?.toLocaleString()}
+   Size: ${comp.sqft?.toLocaleString()} sqft
+   Price/SqFt: $${Math.round(comp.price / comp.sqft)}`;
+      });
+    }
+
+    reportContent += `
+
+==================================================
+MARKET DATA
+==================================================
+Market Trend: ${reportData.marketData.trend}
+Lead Potential: ${reportData.marketData.leadPotential}
+
+Report generated by PropStream Real Estate Analytics Platform
+`;
+
+    return reportContent;
+  };
+
+  const exportReport = () => {
+    let content, filename, mimeType;
+
+    switch (exportFormat) {
+      case 'pdf':
+        content = generatePDFReport();
+        filename = `deal-analysis-${property?.address?.replace(/\s+/g, '-') || 'property'}.txt`;
+        mimeType = 'text/plain';
+        break;
+      case 'json':
+        content = JSON.stringify({
+          property,
+          offerCalculation,
+          aiAnalysis,
+          exportDate: new Date().toISOString()
+        }, null, 2);
+        filename = `deal-data-${property?.address?.replace(/\s+/g, '-') || 'property'}.json`;
+        mimeType = 'application/json';
+        break;
+      case 'csv':
+        content = generateCSVReport();
+        filename = `deal-summary-${property?.address?.replace(/\s+/g, '-') || 'property'}.csv`;
+        mimeType = 'text/csv';
+        break;
+      default:
+        return;
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const generateCSVReport = () => {
+    const headers = [
+      'Address', 'Price', 'Bedrooms', 'Bathrooms', 'SqFt', 'Year Built',
+      'Conservative Offer', 'Aggressive Offer', 'Market Offer',
+      'AI Score', 'Price Assessment', 'Market Trend', 'Lead Potential'
+    ];
+
+    const data = [
+      property?.address || '',
+      property?.price || '',
+      property?.bedrooms || '',
+      property?.bathrooms || '',
+      property?.sqft || '',
+      property?.yearBuilt || '',
+      offerCalculation?.conservativeOffer || '',
+      offerCalculation?.aggressiveOffer || '',
+      offerCalculation?.marketOffer || '',
+      aiAnalysis?.investmentScore || aiAnalysis?.score || '',
+      aiAnalysis?.priceAssessment || '',
+      property?.marketTrend || '',
+      property?.leadPotential || ''
+    ];
+
+    return `${headers.join(',')}\n${data.join(',')}`;
+  };
+
+  const emailReport = () => {
+    const content = generatePDFReport();
+    const subject = `Investment Analysis Report - ${property?.address || 'Property'}`;
+    const body = `Please find attached the investment analysis report for ${property?.address || 'the property'}.\n\n${content}`;
+    
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailto);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-xl shadow-lg p-6"
+    >
+      <div className="flex items-center space-x-3 mb-6">
+        <SafeIcon icon={FiDownload} className="text-2xl text-primary-600" />
+        <h3 className="text-xl font-bold text-gray-900">Export Deal Analysis</h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Export Options */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="pdf"
+                  checked={exportFormat === 'pdf'}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  className="mr-2"
+                />
+                <SafeIcon icon={FiFileText} className="mr-2 text-red-600" />
+                <span>PDF Report (Text Format)</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="json"
+                  checked={exportFormat === 'json'}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  className="mr-2"
+                />
+                <SafeIcon icon={FiDatabase} className="mr-2 text-blue-600" />
+                <span>JSON Data</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="csv"
+                  checked={exportFormat === 'csv'}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  className="mr-2"
+                />
+                <SafeIcon icon={FiFileText} className="mr-2 text-green-600" />
+                <span>CSV Spreadsheet</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Include Sections</label>
+            <div className="space-y-2">
+              {Object.entries(includeOptions).map(([key, value]) => (
+                <label key={key} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    onChange={(e) => setIncludeOptions(prev => ({
+                      ...prev,
+                      [key]: e.target.checked
+                    }))}
+                    className="mr-2"
+                  />
+                  <span className="capitalize text-sm">
+                    {key.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-gray-900">Export Preview</h4>
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 text-sm">
+            <div className="space-y-2">
+              <div className="font-medium">
+                📊 {property?.address || 'Property Address'}
+              </div>
+              <div className="text-gray-600">
+                Generated: {new Date().toLocaleDateString()}
+              </div>
+              {includeOptions.propertyDetails && (
+                <div className="text-gray-600">
+                  ✓ Property Details & Specifications
+                </div>
+              )}
+              {includeOptions.offerCalculation && offerCalculation && (
+                <div className="text-gray-600">
+                  ✓ Offer Calculations & ROI Analysis
+                </div>
+              )}
+              {includeOptions.aiAnalysis && aiAnalysis && (
+                <div className="text-gray-600">
+                  ✓ AI Investment Analysis & Recommendations
+                </div>
+              )}
+              {includeOptions.comparables && (
+                <div className="text-gray-600">
+                  ✓ Comparable Sales Data
+                </div>
+              )}
+              {includeOptions.marketData && (
+                <div className="text-gray-600">
+                  ✓ Market Trends & Lead Potential
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <motion.button
+              onClick={exportReport}
+              className="w-full bg-primary-600 text-white py-3 px-4 rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <SafeIcon icon={FiDownload} />
+              <span>Download Report</span>
+            </motion.button>
+
+            <motion.button
+              onClick={emailReport}
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <SafeIcon icon={FiMail} />
+              <span>Email Report</span>
+            </motion.button>
+          </div>
+
+          <div className="text-xs text-gray-500 mt-4">
+            <p>Reports include comprehensive property analysis, investment calculations, and AI-powered insights to support your real estate decisions.</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+export default DealExport;
